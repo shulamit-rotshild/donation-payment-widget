@@ -12,10 +12,23 @@ class DonationPaymentWidget extends HTMLElement {
       <div id="error-message" style="color:red; font-size:14px; margin-top:8px;"></div>
     `;
 
+    this.stripeReady = false;
+    this.pendingConfig = null;
+
+    const pk = this.getAttribute('publishable-key');
+
     this.loadScript('https://js.stripe.com/v3/').then(() => {
-      const pk = this.getAttribute('publishable-key');
       this.stripe = Stripe(pk);
+      this.stripeReady = true;
       this.dispatchEvent(new CustomEvent('widget-ready', { bubbles: true }));
+
+      // אם payment-config כבר הגיע לפני שסטרייפ היה מוכן - נריץ אותו עכשיו
+      if (this.pendingConfig) {
+        this.initPayment(this.pendingConfig);
+        this.pendingConfig = null;
+      }
+    }).catch(err => {
+      console.error('Failed to load Stripe.js:', err);
     });
   }
 
@@ -33,15 +46,37 @@ class DonationPaymentWidget extends HTMLElement {
     });
   }
 
-  // נקודת הכניסה הראשית - נקראת מ-Velo
-  async initPayment({ clientSecret, mode, amount, currency }) {
-    this.clientSecret = clientSecret;
-    this.querySelector('#error-message').innerText = '';
+  static get observedAttributes() {
+    return ['payment-config'];
+  }
 
-    if (mode === 'wallet') {
-      await this.renderWalletButton(clientSecret, amount, currency);
-    } else {
-      this.renderCardForm(clientSecret);
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (name === 'payment-config' && newValue) {
+      const config = JSON.parse(newValue);
+
+      if (this.stripeReady) {
+        this.initPayment(config);
+      } else {
+        // סטרייפ עוד לא נטען - שומרים להרצה מאוחרת יותר
+        this.pendingConfig = config;
+      }
+    }
+  }
+
+  async initPayment({ clientSecret, mode, amount, currency }) {
+    try {
+      this.clientSecret = clientSecret;
+      const errorEl = this.querySelector('#error-message');
+      if (errorEl) errorEl.innerText = '';
+
+      if (mode === 'wallet') {
+        await this.renderWalletButton(clientSecret, amount, currency);
+      } else {
+        this.renderCardForm(clientSecret);
+      }
+    } catch (err) {
+      console.error('[donation-widget] initPayment failed:', err);
+      this.notifyError(err.message || 'Unknown error');
     }
   }
 
