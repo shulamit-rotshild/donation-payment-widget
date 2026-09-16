@@ -104,52 +104,48 @@ class DonationPaymentWidget extends HTMLElement {
     };
   }
 
+  // ===== גרסה חדשה - Express Checkout Element (Apple Pay + Google Pay) =====
   async renderWalletButton(clientSecret, amount, currency) {
-    const paymentRequest = this.stripe.paymentRequest({
-      country: currency === 'USD' ? 'US' : 'IL',
+    const elements = this.stripe.elements({
+      mode: 'payment',
+      amount: Math.round(amount * 100),
       currency: currency.toLowerCase(),
-      total: { label: 'תרומה', amount: Math.round(amount * 100) },
-      requestPayerName: true,
-      requestPayerEmail: true,
+    });
+    this.walletElements = elements;
+
+    const expressCheckoutElement = elements.create('expressCheckout', {
+      paymentMethods: {
+        applePay: 'always',
+        googlePay: 'always',
+        link: 'never'
+      }
     });
 
-    const elements = this.stripe.elements();
-    const prButton = elements.create('paymentRequestButton', { paymentRequest });
+    const container = this.querySelector('#payment-element');
+    expressCheckoutElement.mount(container);
 
-    const result = await paymentRequest.canMakePayment();
+    expressCheckoutElement.on('ready', ({ availablePaymentMethods }) => {
+      console.log('[donation-widget] available wallet methods:', availablePaymentMethods);
+      if (!availablePaymentMethods || Object.keys(availablePaymentMethods).length === 0) {
+        this.querySelector('#wallet-not-available').style.display = 'block';
+        this.dispatchEvent(new CustomEvent('wallet-unavailable', { bubbles: true }));
+        container.style.display = 'none';
+      }
+    });
 
-    if (!result) {
-      this.querySelector('#wallet-not-available').style.display = 'block';
-      this.dispatchEvent(new CustomEvent('wallet-unavailable', { bubbles: true }));
-      return;
-    }
-
-    prButton.mount(this.querySelector('#payment-element'));
-
-    paymentRequest.on('paymentmethod', async (ev) => {
-      const { paymentIntent, error } = await this.stripe.confirmCardPayment(
+    expressCheckoutElement.on('confirm', async (event) => {
+      const { error } = await this.stripe.confirmPayment({
+        elements,
         clientSecret,
-        { payment_method: ev.paymentMethod.id },
-        { handleActions: false }
-      );
+        confirmParams: { return_url: window.location.href },
+        redirect: 'if_required'
+      });
 
       if (error) {
-        ev.complete('fail');
         this.notifyError(error.message);
-        return;
+      } else {
+        this.notifySuccess();
       }
-
-      ev.complete('success');
-
-      if (paymentIntent.status === 'requires_action') {
-        const { error: confirmError } = await this.stripe.confirmCardPayment(clientSecret);
-        if (confirmError) {
-          this.notifyError(confirmError.message);
-          return;
-        }
-      }
-
-      this.notifySuccess();
     });
   }
 
