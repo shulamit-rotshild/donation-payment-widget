@@ -1,5 +1,8 @@
 class DonationPaymentWidget extends HTMLElement {
 
+  stripeReady = false;
+  pendingConfig = null;
+
   connectedCallback() {
     this.innerHTML = `
       <div id="payment-element"></div>
@@ -12,9 +15,6 @@ class DonationPaymentWidget extends HTMLElement {
       <div id="error-message" style="color:red; font-size:14px; margin-top:8px;"></div>
     `;
 
-    this.stripeReady = false;
-    this.pendingConfig = null;
-
     const pk = this.getAttribute('publishable-key');
 
     this.loadScript('https://js.stripe.com/v3/').then(() => {
@@ -22,7 +22,6 @@ class DonationPaymentWidget extends HTMLElement {
       this.stripeReady = true;
       this.dispatchEvent(new CustomEvent('widget-ready', { bubbles: true }));
 
-      // אם payment-config כבר הגיע לפני שסטרייפ היה מוכן - נריץ אותו עכשיו
       if (this.pendingConfig) {
         this.initPayment(this.pendingConfig);
         this.pendingConfig = null;
@@ -57,7 +56,6 @@ class DonationPaymentWidget extends HTMLElement {
       if (this.stripeReady) {
         this.initPayment(config);
       } else {
-        // סטרייפ עוד לא נטען - שומרים להרצה מאוחרת יותר
         this.pendingConfig = config;
       }
     }
