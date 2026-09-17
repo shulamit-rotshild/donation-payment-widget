@@ -1,7 +1,7 @@
 class DonationPaymentWidget extends HTMLElement {
 
   stripeReady = false;
-  pendingConfig = null;
+  pendingConfig = null;F
 
   connectedCallback() {
     this.innerHTML = `
@@ -78,13 +78,42 @@ class DonationPaymentWidget extends HTMLElement {
   }
 
   renderCardForm(clientSecret) {
-    const elements = this.stripe.elements({ clientSecret });
+   const appearance = {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#C75EFF',
+        colorText: '#400052',
+        colorTextSecondary: '#400052',
+        colorTextPlaceholder: '#9B7FA8',
+        fontFamily: 'Assistant, sans-serif',
+        borderRadius: '6px',
+        spacingUnit: '4px',
+      },
+      rules: {
+        '.Label': {
+          color: '#400052',
+          fontWeight: '600',
+        },
+        '.Input': {
+          border: '1px solid #D8B4E8',
+        },
+        '.Input:focus': {
+          border: '1px solid #C75EFF',
+          boxShadow: '0 0 0 1px #C75EFF',
+        },
+      }
+    };
+
+    const elements = this.stripe.elements({ clientSecret, appearance });
     this.elements = elements;
     const paymentElement = elements.create('payment');
     paymentElement.mount(this.querySelector('#payment-element'));
 
     const submitBtn = this.querySelector('#submit-btn');
     submitBtn.style.display = 'block';
+    submitBtn.style.background = '#C75EFF';
+    submitBtn.style.color = '#400052';
+    submitBtn.style.fontWeight = '700';
 
     submitBtn.onclick = async () => {
       this.querySelector('#error-message').innerText = '';
@@ -105,7 +134,17 @@ class DonationPaymentWidget extends HTMLElement {
 
   async renderWalletButton(clientSecret, amount, currency) {
     // קושרים ישירות ל-clientSecret (תואם גם לתשלום חד-פעמי וגם למנוי עם setup_future_usage)
-    const elements = this.stripe.elements({ clientSecret });
+     const appearance = {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#C75EFF',
+        colorText: '#400052',
+        fontFamily: 'Assistant, sans-serif',
+        borderRadius: '6px',
+      }
+    };
+
+    const elements = this.stripe.elements({ clientSecret, appearance });
     this.walletElements = elements;
 
     const expressCheckoutElement = elements.create('expressCheckout', {
