@@ -98,17 +98,14 @@ class DonationPaymentWidget extends HTMLElement {
         this.querySelector('#error-message').innerText = error.message;
         this.notifyError(error.message);
       } else {
-        this.notifySuccess(paymentIntent); // ← מעביר פרטים עכשיו
+        this.notifySuccess(paymentIntent);
       }
     };
   }
 
   async renderWalletButton(clientSecret, amount, currency) {
-    const elements = this.stripe.elements({
-      mode: 'payment',
-      amount: Math.round(amount * 100),
-      currency: currency.toLowerCase(),
-    });
+    // קושרים ישירות ל-clientSecret (תואם גם לתשלום חד-פעמי וגם למנוי עם setup_future_usage)
+    const elements = this.stripe.elements({ clientSecret });
     this.walletElements = elements;
 
     const expressCheckoutElement = elements.create('expressCheckout', {
@@ -133,7 +130,6 @@ class DonationPaymentWidget extends HTMLElement {
     expressCheckoutElement.on('confirm', async (event) => {
       const { error, paymentIntent } = await this.stripe.confirmPayment({
         elements,
-        clientSecret,
         confirmParams: { return_url: window.location.href },
         redirect: 'if_required'
       });
@@ -141,7 +137,7 @@ class DonationPaymentWidget extends HTMLElement {
       if (error) {
         this.notifyError(error.message);
       } else {
-        this.notifySuccess(paymentIntent); // ← מעביר פרטים עכשיו
+        this.notifySuccess(paymentIntent);
       }
     });
   }
