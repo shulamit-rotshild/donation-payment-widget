@@ -4,25 +4,16 @@ class DonationPaymentWidget extends HTMLElement {
   pendingConfig = null;
 
   connectedCallback() {
-    this.style.display = 'block';
-    this.style.width = '100%';
-
     this.innerHTML = `
       <div id="payment-element"></div>
       <div id="wallet-not-available" style="display:none; color:#666; font-size:14px; margin:10px 0;">
         Apple Pay / Google Pay לא זמינים במכשיר זה
       </div>
-      <button id="submit-btn" style="display:none; width:100%; padding:12px; margin-top:10px; background:#C75EFF; color:#400052; border:none; border-radius:6px; font-size:16px; font-weight:700; cursor:pointer;">
+      <button id="submit-btn" style="display:none; width:100%; padding:12px; margin-top:10px; background:#6b21a8; color:white; border:none; border-radius:6px; font-size:16px; cursor:pointer;">
         אשר תשלום
       </button>
       <div id="error-message" style="color:red; font-size:14px; margin-top:8px;"></div>
     `;
-
-    // גובה אוטומטי - עוקבים אחרי שינויים בתוכן ומעדכנים את גובה הרכיב עצמו
-    const resizeObserver = new ResizeObserver(() => {
-      this.style.height = this.scrollHeight + 'px';
-    });
-    resizeObserver.observe(this);
 
     const pk = this.getAttribute('publishable-key');
 
@@ -69,34 +60,6 @@ class DonationPaymentWidget extends HTMLElement {
     }
   }
 
-  getAppearance() {
-    return {
-      theme: 'stripe',
-      variables: {
-        colorPrimary: '#C75EFF',
-        colorText: '#400052',
-        colorTextSecondary: '#400052',
-        colorTextPlaceholder: '#9B7FA8',
-        fontFamily: 'Assistant, sans-serif',
-        borderRadius: '6px',
-        spacingUnit: '4px',
-      },
-      rules: {
-        '.Label': {
-          color: '#400052',
-          fontWeight: '600',
-        },
-        '.Input': {
-          border: '1px solid #D8B4E8',
-        },
-        '.Input:focus': {
-          border: '1px solid #C75EFF',
-          boxShadow: '0 0 0 1px #C75EFF',
-        },
-      }
-    };
-  }
-
   async initPayment({ clientSecret, mode, amount, currency }) {
     try {
       this.clientSecret = clientSecret;
@@ -115,7 +78,7 @@ class DonationPaymentWidget extends HTMLElement {
   }
 
   renderCardForm(clientSecret) {
-    const elements = this.stripe.elements({ clientSecret, appearance: this.getAppearance() });
+    const elements = this.stripe.elements({ clientSecret });
     this.elements = elements;
     const paymentElement = elements.create('payment');
     paymentElement.mount(this.querySelector('#payment-element'));
@@ -141,7 +104,8 @@ class DonationPaymentWidget extends HTMLElement {
   }
 
   async renderWalletButton(clientSecret, amount, currency) {
-    const elements = this.stripe.elements({ clientSecret, appearance: this.getAppearance() });
+    // קושרים ישירות ל-clientSecret (תואם גם לתשלום חד-פעמי וגם למנוי עם setup_future_usage)
+    const elements = this.stripe.elements({ clientSecret });
     this.walletElements = elements;
 
     const expressCheckoutElement = elements.create('expressCheckout', {
