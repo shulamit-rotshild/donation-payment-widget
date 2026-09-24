@@ -142,17 +142,18 @@ class DonationPaymentWidget extends HTMLElement {
     });
   }
 
-  notifySuccess(paymentIntent) {
+ notifySuccess(paymentIntent) {
     this.dispatchEvent(new CustomEvent('payment-success', {
       bubbles: true,
       detail: {
         transactionId: paymentIntent?.id || null,
         amount: paymentIntent ? paymentIntent.amount / 100 : null,
         currency: paymentIntent?.currency || null,
-        status: paymentIntent?.status || null
+        status: paymentIntent?.status || null,
+        raw: paymentIntent || null
       }
     }));
-  }
+}
 
   notifyError(message) {
     this.dispatchEvent(new CustomEvent('payment-error', { bubbles: true, detail: { message } }));
