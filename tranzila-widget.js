@@ -16,8 +16,9 @@ class TranzilaPaymentWidget extends HTMLElement {
       if (data.ok) {
         this.dispatchEvent(new CustomEvent('payment-success', {
           bubbles: true,
-          detail: {
+         detail: {
             transactionId: data.transactionId || null,
+            last4: data.last4 || null,
             amount: data.amount ? Number(data.amount) : null,
             currency: 'ils',
             status: 'succeeded',
