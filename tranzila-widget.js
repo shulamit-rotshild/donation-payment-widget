@@ -1,48 +1,17 @@
 class TranzilaPaymentWidget extends HTMLElement {
 
   pendingConfig = null;
-  allowedOrigin = null;
 
   connectedCallback() {
-    this.frameName = 'tranzila-frame-' + Math.random().toString(36).slice(2);
     this.innerHTML = `
-      <iframe name="${this.frameName}" allowpaymentrequest="true"
-        style="width:100%; height:650px; border:0;"></iframe>
+      <div style="padding:24px; text-align:center; font-family:sans-serif; font-size:16px;">
+        מעבירים אותך לדף התשלום המאובטח...
+      </div>
     `;
-
-    this.onMessage = (event) => {
-      if (this.allowedOrigin && event.origin !== this.allowedOrigin) return;
-      const data = event.data;
-      if (!data || data.type !== 'tranzila-result') return;
-
-      if (data.ok) {
-        this.dispatchEvent(new CustomEvent('payment-success', {
-          bubbles: true,
-          detail: {
-            transactionId: data.transactionId || null,
-            amount: data.amount ? Number(data.amount) : null,
-            currency: 'ils',
-            status: 'succeeded',
-            raw: null
-          }
-        }));
-      } else {
-        this.dispatchEvent(new CustomEvent('payment-error', {
-          bubbles: true,
-          detail: { message: data.message || 'התשלום נכשל' }
-        }));
-      }
-    };
-    window.addEventListener('message', this.onMessage);
-
     if (this.pendingConfig) {
       this.start(this.pendingConfig);
       this.pendingConfig = null;
     }
-  }
-
-  disconnectedCallback() {
-    if (this.onMessage) window.removeEventListener('message', this.onMessage);
   }
 
   static get observedAttributes() {
@@ -52,20 +21,18 @@ class TranzilaPaymentWidget extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     if (name !== 'payment-config' || !newValue) return;
     const config = JSON.parse(newValue);
-    if (this.isConnected && this.frameName) {
+    if (this.isConnected) {
       this.start(config);
     } else {
       this.pendingConfig = config;
     }
   }
 
-  start({ action, fields, allowedOrigin }) {
-    this.allowedOrigin = allowedOrigin || null;
-
+  start({ action, fields }) {
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = action;
-    form.target = this.frameName;
+    form.target = '_top'; // פותח את עמוד התשלום של טרנזילה בכל הדף
     form.style.display = 'none';
 
     Object.keys(fields).forEach((key) => {
@@ -78,7 +45,6 @@ class TranzilaPaymentWidget extends HTMLElement {
 
     this.appendChild(form);
     form.submit();
-    form.remove();
   }
 }
 
