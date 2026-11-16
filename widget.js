@@ -1,7 +1,9 @@
 class DonationPaymentWidget extends HTMLElement {
 
-  stripeReady = false;
+  scriptReady = false;
   pendingConfig = null;
+  stripe = null;
+  currentKey = null;
 
   connectedCallback() {
     this.innerHTML = `
@@ -15,11 +17,9 @@ class DonationPaymentWidget extends HTMLElement {
       <div id="error-message" style="color:red; font-size:14px; margin-top:8px;"></div>
     `;
 
-    const pk = this.getAttribute('publishable-key');
-
+    // רק טוענים את הספרייה. החיבור לחשבון Stripe נעשה בכל תשלום, לפי המפתח שהתקבל
     this.loadScript('https://js.stripe.com/v3/').then(() => {
-      this.stripe = Stripe(pk);
-      this.stripeReady = true;
+      this.scriptReady = true;
       this.dispatchEvent(new CustomEvent('widget-ready', { bubbles: true }));
 
       if (this.pendingConfig) {
@@ -52,7 +52,7 @@ class DonationPaymentWidget extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     if (name === 'payment-config' && newValue) {
       const config = JSON.parse(newValue);
-      if (this.stripeReady) {
+      if (this.scriptReady) {
         this.initPayment(config);
       } else {
         this.pendingConfig = config;
@@ -60,11 +60,41 @@ class DonationPaymentWidget extends HTMLElement {
     }
   }
 
+  // יוצר חיבור ל-Stripe לפי המפתח הנוכחי, ומחליף אותו אם החשבון השתנה (למשל ארה"ב → קנדה)
+  getStripe() {
+    const pk = this.getAttribute('publishable-key');
+    if (!pk) throw new Error('Missing publishable key');
+    if (!this.stripe || this.currentKey !== pk) {
+      this.stripe = Stripe(pk);
+      this.currentKey = pk;
+    }
+    return this.stripe;
+  }
+
+  // מנקה טופס קודם, כדי שאפשר יהיה לטעון תשלום חדש באותו רכיב
+  resetUI() {
+    const container = this.querySelector('#payment-element');
+    if (container) {
+      container.innerHTML = '';
+      container.style.display = '';
+    }
+    const notAvailable = this.querySelector('#wallet-not-available');
+    if (notAvailable) notAvailable.style.display = 'none';
+    const submitBtn = this.querySelector('#submit-btn');
+    if (submitBtn) {
+      submitBtn.style.display = 'none';
+      submitBtn.onclick = null;
+      submitBtn.disabled = false;
+    }
+    const errorEl = this.querySelector('#error-message');
+    if (errorEl) errorEl.innerText = '';
+  }
+
   async initPayment({ clientSecret, mode, amount, currency }) {
     try {
+      this.getStripe();
+      this.resetUI();
       this.clientSecret = clientSecret;
-      const errorEl = this.querySelector('#error-message');
-      if (errorEl) errorEl.innerText = '';
 
       if (mode === 'wallet') {
         await this.renderWalletButton(clientSecret, amount, currency);
@@ -88,6 +118,8 @@ class DonationPaymentWidget extends HTMLElement {
 
     submitBtn.onclick = async () => {
       this.querySelector('#error-message').innerText = '';
+      submitBtn.disabled = true; // מונע לחיצה כפולה ותשלום כפול
+
       const { error, paymentIntent } = await this.stripe.confirmPayment({
         elements,
         confirmParams: { return_url: window.location.href },
@@ -95,6 +127,7 @@ class DonationPaymentWidget extends HTMLElement {
       });
 
       if (error) {
+        submitBtn.disabled = false;
         this.querySelector('#error-message').innerText = error.message;
         this.notifyError(error.message);
       } else {
@@ -104,7 +137,7 @@ class DonationPaymentWidget extends HTMLElement {
   }
 
   async renderWalletButton(clientSecret, amount, currency) {
-    // קושרים ישירות ל-clientSecret (תואם גם לתשלום חד-פעמי וגם למנוי עם setup_future_usage)
+    // קושרים ישירות ל-clientSecret (תואם גם לתשלום חד-פעמי וגם למנוי)
     const elements = this.stripe.elements({ clientSecret });
     this.walletElements = elements;
 
@@ -142,7 +175,7 @@ class DonationPaymentWidget extends HTMLElement {
     });
   }
 
- notifySuccess(paymentIntent) {
+  notifySuccess(paymentIntent) {
     this.dispatchEvent(new CustomEvent('payment-success', {
       bubbles: true,
       detail: {
@@ -153,7 +186,7 @@ class DonationPaymentWidget extends HTMLElement {
         raw: paymentIntent || null
       }
     }));
-}
+  }
 
   notifyError(message) {
     this.dispatchEvent(new CustomEvent('payment-error', { bubbles: true, detail: { message } }));
