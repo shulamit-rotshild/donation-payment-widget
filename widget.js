@@ -129,7 +129,7 @@ class DonationPaymentWidget extends HTMLElement {
       if (error) {
         submitBtn.disabled = false;
         this.querySelector('#error-message').innerText = error.message;
-        this.notifyError(error.message);
+        this.notifyError(error.message, error);
       } else {
         this.notifySuccess(paymentIntent);
       }
@@ -168,7 +168,7 @@ class DonationPaymentWidget extends HTMLElement {
       });
 
       if (error) {
-        this.notifyError(error.message);
+        this.notifyError(error.message, error);
       } else {
         this.notifySuccess(paymentIntent);
       }
@@ -188,8 +188,18 @@ class DonationPaymentWidget extends HTMLElement {
     }));
   }
 
-  notifyError(message) {
-    this.dispatchEvent(new CustomEvent('payment-error', { bubbles: true, detail: { message } }));
+  // error הוא אובייקט השגיאה של Stripe (אם יש). ממנו לוקחים סוג, קוד סירוב ומזהה העסקה
+  notifyError(message, error = null) {
+    this.dispatchEvent(new CustomEvent('payment-error', {
+      bubbles: true,
+      detail: {
+        message,
+        type: error?.type || null,
+        code: error?.code || null,
+        declineCode: error?.decline_code || null,
+        transactionId: error?.payment_intent?.id || null
+      }
+    }));
   }
 }
 
